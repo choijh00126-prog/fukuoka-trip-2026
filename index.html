@@ -779,7 +779,7 @@ function initSpotMap(){
   }).addTo(spotMap);
   DATA.spots.forEach(s => {
     if(!s.ll) return;
-    const m = L.circleMarker(s.ll, {radius:9, weight:2, color:'#fff', fillColor:spotColor(s), fillOpacity:.95});
+    const m = L.circleMarker(s.ll, {radius:8, weight:2, color:'#fff', fillColor:spotColor(s), fillOpacity:.95});
     m.bindPopup(spotPopup(s), {maxWidth: 270});
     m.bindTooltip(esc(s.name), {direction:'top', offset:[0, -8]});
     m.addTo(spotMap);
@@ -804,7 +804,7 @@ function renderSpots(){
         + esc(c === '전체' ? '전체 ' + DATA.spots.length + '곳' : c) + '</button>').join('')
     + '</div>'
     + '<div id="tripMap" class="tripmap"></div>'
-    + '<div class="maphint">핀 색 = 카테고리(숙소 빨강 · 식당 주황 · 술집 보라 · 카페 민트 · 온천·관광 파랑 · 쇼핑·마켓 초록). 카테고리를 누르면 지도 핀과 카드가 함께 걸러집니다.</div>'
+    + '<div class="maphint">핀 색 = 카테고리(숙소 빨강 · 식당 주황 · 술집 보라 · 카페 민트 · 온천·관광 파랑 · 쇼핑·마켓 초록). 카테고리를 누르면 지도 핀과 카드가 함께 걸러집니다. 핀이 겹쳐 보이면 지도를 확대해 보세요.</div>'
     + '</div>'
     + '<div class="spots" id="spotList">' + DATA.spots.map(spotCard).join('') + '</div>';
   $('#panel-spots').innerHTML = h;
