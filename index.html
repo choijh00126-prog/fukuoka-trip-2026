@@ -286,10 +286,46 @@
     display:inline-flex; align-items:center; gap:5px; font-size:12.5px; font-weight:800;
     padding:8px 12px; border-radius:10px; border:1px solid transparent; white-space:nowrap;
   }
+  .btn{cursor:pointer}
   .btn.map{background:#1a73e8; color:#fff}
   .btn.map:hover{background:#1559b8}
   .btn.ghost{background:#fff; color:var(--slate); border-color:#cdd9ec}
   .btn.ghost:hover{background:#f4f8ff}
+  .btn.kakao{background:#FEE500; color:#3C1E1E; padding:11px 16px; font-size:14px; border-radius:11px}
+  .btn.kakao:hover{background:#F5DC00}
+
+  /* ---------- 의견 제안 ---------- */
+  .fb-chips{display:flex; flex-wrap:wrap; gap:7px}
+  .fb-chip{
+    font:inherit; font-size:13px; font-weight:800; cursor:pointer; padding:7px 13px; border-radius:999px;
+    border:1px solid var(--line); background:#fff; color:var(--muted); transition:.15s;
+  }
+  .fb-chip:hover{border-color:#c7d6ee; color:var(--navy)}
+  .fb-chip[aria-pressed="true"]{background:var(--navy); color:#fff; border-color:transparent}
+  .fb-field{margin-bottom:14px}
+  .fb-field > label{display:block; font-size:12px; font-weight:800; color:var(--muted); margin-bottom:6px; letter-spacing:.02em}
+  .fb-field input,.fb-field textarea{
+    font:inherit; width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:11px;
+    background:#fff; color:var(--txt); font-size:14px;
+  }
+  .fb-field textarea{min-height:112px; resize:vertical; line-height:1.55}
+  .fb-field input:focus,.fb-field textarea:focus{outline:2px solid #b9cdf0; outline-offset:1px}
+  .fb-actions{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:2px}
+  .fb-ok{
+    margin-top:12px; padding:10px 12px; border-radius:12px; background:#E2EFDA; border:1px solid #b7d9a6;
+    color:#1E7145; font-weight:800; font-size:13px;
+  }
+  .fb-ok.warn{background:#FFF9E6; border-color:#F3E3B0; color:#6b5a1f}
+  .fb-pv{
+    white-space:pre-wrap; word-break:break-word; font-family:inherit; font-size:13px; line-height:1.6;
+    margin:0; padding:12px; border:1px dashed #cdd9ec; border-radius:12px; background:#fbfcff; color:#2b3446;
+  }
+  .fb-hist{display:grid; gap:8px}
+  .fb-h{border:1px solid var(--line); border-radius:12px; padding:10px 12px; background:#fff}
+  .fb-h .top{display:flex; justify-content:space-between; gap:8px; font-size:11.5px; color:var(--muted); font-weight:800}
+  .fb-h .bd{font-size:13px; margin-top:4px; line-height:1.5; white-space:pre-wrap; word-break:break-word}
+  .fb-h .bd .pl{color:var(--slate); font-weight:800}
+  .fb-empty{font-size:12.5px; color:var(--muted); padding:10px 12px; border:1px dashed var(--line); border-radius:12px; background:#fbfcff}
 
   /* ---------- cost ---------- */
   .ratebox{
@@ -379,6 +415,7 @@
   <section class="panel" id="panel-schedule" role="tabpanel"></section>
   <section class="panel" id="panel-spots" role="tabpanel"></section>
   <section class="panel" id="panel-cost" role="tabpanel"></section>
+  <section class="panel" id="panel-feedback" role="tabpanel"></section>
 </main>
 
 <footer>
@@ -432,7 +469,8 @@ const TABS = [
   {id:'summary', label:'📋 요약·준비물'},
   {id:'schedule', label:'🗓️ 3박 4일 일정표'},
   {id:'spots', label:'📍 스팟·사진·지도'},
-  {id:'cost', label:'💴 예상 경비'}
+  {id:'cost', label:'💴 예상 경비'},
+  {id:'feedback', label:'💬 의견 제안'}
 ];
 let currentTab = 'summary';
 (function tabs(){
@@ -733,6 +771,134 @@ function renderCost(){
   calc();
 }
 
+/* ---------------- 의견 제안 (동행자 의견 → 카톡 복사) ---------------- */
+const FB_WHO  = ['최재훈','김은중','김현기','박진우'];
+const FB_KIND = ['🍽️ 맛집 추천','🗓️ 일정 수정','🍻 밤 스팟','💡 기타'];
+const FB_DAY  = ['전체','DAY 1 (12/17 목)','DAY 2 (12/18 금)','DAY 3 (12/19 토)','DAY 4 (12/20 일)'];
+const FB_KEY  = 'fk.fb.log';
+const fb = { who: FB_WHO[0], kind: FB_KIND[0], day: FB_DAY[0], place: '', body: '' };
+
+function fbMessage(){
+  return '[후쿠오카 일정 의견 - ' + fb.who + ']\n'
+       + '• 구분: ' + fb.kind + ' (' + fb.day + ')\n'
+       + '• 장소: ' + (fb.place.trim() || '-') + '\n'
+       + '• 내용: ' + (fb.body.trim() || '(내용 없음)');
+}
+function fbLog(){
+  try{ const v = JSON.parse(store.get(FB_KEY,'[]')); return Array.isArray(v) ? v : []; }catch(e){ return []; }
+}
+function fbSaveLog(list){ try{ store.set(FB_KEY, JSON.stringify(list.slice(0,20))); }catch(e){} }
+function fbWhen(iso){
+  const d = new Date(iso); if(isNaN(d)) return '';
+  const p = n => (n<10?'0':'') + n;
+  return (d.getMonth()+1) + '/' + d.getDate() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+}
+function fbRenderHist(){
+  const el = $('#fbHist'); if(!el) return;
+  const list = fbLog();
+  if(!list.length){
+    el.innerHTML = '<div class="fb-empty">아직 보낸 의견이 없습니다. 복사하면 여기에 쌓이고, 이 기기(브라우저)에만 남습니다.</div>';
+    return;
+  }
+  el.innerHTML = list.map(it =>
+      '<div class="fb-h"><div class="top"><span>' + esc(it.who) + ' · ' + esc(it.kind) + ' · ' + esc(it.day) + '</span>'
+    + '<span>' + esc(fbWhen(it.t)) + '</span></div>'
+    + '<div class="bd">' + (it.place ? '<span class="pl">' + esc(it.place) + '</span><br>' : '') + esc(it.body) + '</div></div>'
+    ).join('')
+    + '<div style="text-align:right"><button type="button" class="btn ghost" id="fbHistClear">기록 전체 지우기</button></div>';
+  const c = $('#fbHistClear');
+  if(c) c.addEventListener('click', () => { fbSaveLog([]); fbRenderHist(); });
+}
+function fbUpdate(){
+  const pv = $('#fbPv'); if(pv) pv.textContent = fbMessage();
+}
+function fbLegacyCopy(text){
+  try{
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.setAttribute('readonly','');
+    ta.style.position = 'fixed'; ta.style.top = '-1000px'; ta.style.left = '0'; ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.focus(); ta.select(); ta.setSelectionRange(0, text.length);
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return !!ok;
+  }catch(e){ return false; }
+}
+function fbShowNote(msg, warn){
+  const el = $('#fbOk'); if(!el) return;
+  el.className = 'fb-ok' + (warn ? ' warn' : '');
+  el.textContent = msg; el.hidden = false;
+  clearTimeout(fb._t);
+  fb._t = setTimeout(() => { el.hidden = true; }, 6000);
+}
+function fbCopy(){
+  if(!fb.body.trim()){ fbShowNote('의견 내용을 먼저 입력해 주세요.', true); $('#fbBody').focus(); return; }
+  const msg = fbMessage();
+  const done = ok => {
+    if(ok){
+      fbShowNote('복사 완료! 카톡 단톡방에 붙여넣기 하세요.', false);
+      const list = fbLog();
+      list.unshift({t:new Date().toISOString(), who:fb.who, kind:fb.kind, day:fb.day,
+                    place:fb.place.trim(), body:fb.body.trim(), msg:msg});
+      fbSaveLog(list); fbRenderHist();
+    }else{
+      fbShowNote('자동 복사가 안 됩니다. 아래 미리보기를 길게 눌러 전체 복사해 주세요.', true);
+      const pv = $('#fbPv');
+      if(pv && window.getSelection){
+        const r = document.createRange(); r.selectNodeContents(pv);
+        const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      }
+    }
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(msg).then(() => done(true)).catch(() => done(fbLegacyCopy(msg)));
+  }else{
+    done(fbLegacyCopy(msg));
+  }
+}
+function renderFeedback(){
+  const chips = (group, arr, cur) => '<div class="fb-chips" data-group="' + group + '">'
+    + arr.map(v => '<button type="button" class="fb-chip" data-v="' + esc(v) + '" aria-pressed="' + (v === cur) + '">' + esc(v) + '</button>').join('')
+    + '</div>';
+  const panel = $('#panel-feedback');
+  panel.innerHTML = '<div class="card"><h2>💬 의견 제안</h2>'
+    + '<p class="hint">맛집 추천이나 일정 수정 의견을 적고 <b>카톡용 메시지</b>로 복사해 단톡방에 붙여넣으면 됩니다. '
+    + '페이지에 저장되지 않고, 기록도 내 브라우저에만 남습니다.</p>'
+    + '<div class="fb-field" style="margin-top:14px"><label>작성자</label>' + chips('who', FB_WHO, fb.who) + '</div>'
+    + '<div class="fb-field"><label>구분</label>' + chips('kind', FB_KIND, fb.kind) + '</div>'
+    + '<div class="fb-field"><label>날짜</label>' + chips('day', FB_DAY, fb.day) + '</div>'
+    + '<div class="fb-field"><label for="fbPlace">장소·맛집 이름 (선택)</label>'
+    + '<input id="fbPlace" type="text" autocomplete="off" placeholder="예: 元祖もつ鍋楽天地 天神本店 / 中洲 야타이" value="' + esc(fb.place) + '"></div>'
+    + '<div class="fb-field"><label for="fbBody">의견 내용</label>'
+    + '<textarea id="fbBody" placeholder="예: 12/18 저녁은 야타이 말고 楽天地 모츠나베로 바꾸면 어때? 21시까지 입장하면 돼.">' + esc(fb.body) + '</textarea></div>'
+    + '<div class="fb-actions"><button type="button" class="btn kakao" id="fbCopy">📋 카톡용 메시지 복사하기</button>'
+    + '<button type="button" class="btn ghost" id="fbReset">입력 지우기</button></div>'
+    + '<div class="fb-ok" id="fbOk" hidden></div>'
+    + '<div class="sec-title">미리보기</div><pre class="fb-pv" id="fbPv"></pre>'
+    + '<div class="sec-title">내가 보낸 의견 <span class="hint" style="font-weight:600">— 서버가 아니라 이 기기에만 임시 저장</span></div>'
+    + '<div class="fb-hist" id="fbHist"></div>'
+    + '</div>';
+
+  panel.querySelectorAll('.fb-chips').forEach(g => {
+    g.addEventListener('click', e => {
+      const b = e.target.closest('.fb-chip'); if(!b) return;
+      fb[g.dataset.group] = b.dataset.v;
+      g.querySelectorAll('.fb-chip').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+      fbUpdate();
+    });
+  });
+  $('#fbPlace').addEventListener('input', e => { fb.place = e.target.value; fbUpdate(); });
+  $('#fbBody').addEventListener('input', e => { fb.body = e.target.value; fbUpdate(); });
+  $('#fbCopy').addEventListener('click', fbCopy);
+  $('#fbReset').addEventListener('click', () => {
+    fb.place = ''; fb.body = '';
+    $('#fbPlace').value = ''; $('#fbBody').value = '';
+    $('#fbOk').hidden = true; fbUpdate(); $('#fbBody').focus();
+  });
+  fbUpdate();
+  fbRenderHist();
+}
+
 /* ---------------- modal ---------------- */
 function openModal(key){
   const s = spotByKey[key]; if(!s || !PHOTOS[key]) return;
@@ -754,7 +920,8 @@ renderSummary();
 renderSchedule();
 renderSpots();
 renderCost();
-show((location.hash||'#summary').slice(1) in {summary:1,schedule:1,spots:1,cost:1}
+renderFeedback();
+show((location.hash||'#summary').slice(1) in {summary:1,schedule:1,spots:1,cost:1,feedback:1}
      ? (location.hash||'#summary').slice(1) : 'summary', false);
 </script>
 </body>
